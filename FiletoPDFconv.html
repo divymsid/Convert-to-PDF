@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid PDF Converter</title>
+    
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- pdf-lib.js for PDF creation -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #e0e0e0;
+            --primary-color: #6a0dad;
+            --secondary-color: #0077be;
+            --card-bg-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+            --card-bg-color: rgba(20, 20, 22, 0.65);
+            --border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Basic Reset & Body Styling */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Liquid Glass Animation Background */
+        .liquid-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            animation: color-change 20s linear infinite;
+        }
+
+        .liquid-shape {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.7;
+            animation: move 25s infinite alternate;
+        }
+
+        .shape1 {
+            width: 500px;
+            height: 500px;
+            background: var(--primary-color);
+            top: -10%;
+            left: -10%;
+            animation-duration: 20s;
+        }
+
+        .shape2 {
+            width: 400px;
+            height: 400px;
+            background: var(--secondary-color);
+            bottom: -5%;
+            right: -5%;
+            animation-duration: 18s;
+        }
+
+        .shape3 {
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            bottom: 40%;
+            left: 20%;
+            animation-duration: 22s;
+        }
+
+        .shape4 {
+            width: 250px;
+            height: 250px;
+            background: var(--primary-color);
+            top: 30%;
+            right: 15%;
+            animation-duration: 24s;
+            animation-direction: reverse;
+        }
+        
+        .shape5 {
+            width: 200px;
+            height: 200px;
+            background: var(--secondary-color);
+            top: 50%;
+            left: 50%;
+            animation-duration: 25s;
+        }
+
+        .shape6 {
+            width: 150px;
+            height: 150px;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            top: 10%;
+            right: 30%;
+            animation-duration: 19s;
+            animation-direction: alternate-reverse;
+        }
+
+
+        @keyframes move {
+            from {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            to {
+                transform: translate(400px, 200px) rotate(360deg);
+            }
+        }
+        
+        /* Enhanced liquid effect */
+        @keyframes color-change {
+            0% { filter: blur(100px) contrast(35) hue-rotate(0deg); }
+            100% { filter: blur(100px) contrast(35) hue-rotate(360deg); }
+        }
+
+        /* Main container and Card */
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 90%;
+            max-width: 500px;
+            padding: 2rem;
+        }
+
+        .converter-card {
+            background: var(--card-bg-gradient), var(--card-bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: transform 0.1s ease-out, box-shadow 0.3s ease;
+            transform-style: preserve-3d;
+        }
+
+        .converter-card:hover {
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -1px;
+        }
+
+        .header p {
+            font-size: 1rem;
+            font-weight: 300;
+            color: rgba(224, 224, 224, 0.7);
+            margin-bottom: 2.5rem;
+        }
+
+        /* File Upload Area - Glassy Effect */
+        .upload-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .upload-area.highlight {
+            transform: scale(1.03);
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .upload-area:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 1rem;
+            animation: bob 2.5s infinite ease-in-out;
+            color: white;
+        }
+
+        #file-name {
+            margin-top: 1rem;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        /* Buttons and Links - Glassy Effect */
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 1rem;
+            margin-top: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        #download-link {
+            display: none; /* Hidden by default */
+        }
+        
+        /* Conversion Options for multiple files */
+        #conversion-options {
+            display: none; /* Hidden by default */
+            gap: 1rem;
+        }
+        
+        /* Status and Messages */
+        #status {
+            margin-top: 1.5rem;
+            font-weight: 400;
+            min-height: 24px; /* Reserve space to prevent layout shifts */
+        }
+        
+        .loader {
+            display: none; /* Hidden by default */
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        /* Ripple effect for buttons */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.7);
+            transform: scale(0);
+            animation: ripple-effect 0.6s linear;
+            pointer-events: none;
+        }
+        
+        .copyright {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: rgba(224, 224, 224, 0.5);
+        }
+
+        @keyframes ripple-effect {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes bob {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+            100% { transform: translateY(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Animated background -->
+    <div class="liquid-container">
+        <div class="liquid-shape shape1"></div>
+        <div class="liquid-shape shape2"></div>
+        <div class="liquid-shape shape3"></div>
+        <div class="liquid-shape shape4"></div>
+        <div class="liquid-shape shape5"></div>
+        <div class="liquid-shape shape6"></div>
+    </div>
+
+    <!-- Main content -->
+    <div class="container">
+        <div class="converter-card">
+            <div class="header">
+                <h1>Universal PDF Converter</h1>
+                <p>Convert images and text files to PDF.</p>
+            </div>
+
+            <!-- The file upload area, a label for the hidden file input -->
+            <label for="file-input" class="upload-area">
+                <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M17.25 12c0 3.182-2.568 5.75-5.75 5.75S5.75 15.182 5.75 12 8.318 6.25 11.5 6.25" />
+                </svg>
+                <p id="upload-text">Click to browse or drag & drop files</p>
+                <p id="file-name"></p>
+            </label>
+            <input type="file" id="file-input" multiple>
+
+            <div id="status"></div>
+            <div class="loader" id="loader"></div>
+
+            <button class="btn" id="convert-btn" disabled>Convert to PDF</button>
+
+            <div id="conversion-options">
+                <button class="btn" id="combine-btn">Combine to Single PDF</button>
+                <button class="btn" id="separate-btn">Convert Separately</button>
+            </div>
+            
+            <a id="download-link" href="#" class="btn">Download PDF</a>
+
+            <p class="copyright">© 2025 divym</p>
+        </div>
+    </div>
+
+    <script>
+        const { PDFDocument, rgb } = PDFLib;
+
+        // DOM Elements
+        const fileInput = document.getElementById('file-input');
+        const uploadArea = document.querySelector('.upload-area');
+        const uploadText = document.getElementById('upload-text');
+        const fileNameDisplay = document.getElementById('file-name');
+        
+        const convertBtn = document.getElementById('convert-btn');
+        const conversionOptions = document.getElementById('conversion-options');
+        const combineBtn = document.getElementById('combine-btn');
+        const separateBtn = document.getElementById('separate-btn');
+
+        const downloadLink = document.getElementById('download-link');
+        const statusDisplay = document.getElementById('status');
+        const loader = document.getElementById('loader');
+
+        let selectedFiles = [];
+
+        // --- Event Listeners ---
+        fileInput.addEventListener('change', (event) => handleFileSelect(event.target.files));
+        
+        // --- Drag and Drop Logic ---
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.body.addEventListener(eventName, preventDefaults, false);
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => uploadArea.addEventListener(eventName, () => uploadArea.classList.add('highlight'), false));
+        ['dragleave', 'drop'].forEach(eventName => uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('highlight'), false));
+        
+        uploadArea.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files));
+
+        // Handle conversion button clicks
+        convertBtn.addEventListener('click', convertCombined); // Single file case
+        combineBtn.addEventListener('click', convertCombined);
+        separateBtn.addEventListener('click', convertSeparately);
+
+        // Reset the UI after download is initiated
+        downloadLink.addEventListener('click', () => setTimeout(resetUI, 100));
+        
+        // --- Functions ---
+        function resetUI() {
+            selectedFiles = [];
+            fileInput.value = ''; 
+            uploadText.style.display = 'block';
+            fileNameDisplay.textContent = '';
+            
+            downloadLink.style.display = 'none';
+            conversionOptions.style.display = 'none';
+            convertBtn.style.display = 'inline-block';
+            convertBtn.disabled = true;
+            
+            statusDisplay.textContent = '';
+        }
+        
+        function handleFileSelect(files) {
+            if (!files || files.length === 0) return;
+            
+            selectedFiles = Array.from(files);
+            uploadText.style.display = 'none';
+            downloadLink.style.display = 'none';
+            statusDisplay.textContent = '';
+            
+            if (selectedFiles.length === 1) {
+                fileNameDisplay.textContent = selectedFiles[0].name;
+                convertBtn.style.display = 'inline-block';
+                convertBtn.disabled = false;
+                conversionOptions.style.display = 'none';
+            } else {
+                fileNameDisplay.textContent = `${selectedFiles.length} files selected`;
+                convertBtn.style.display = 'none';
+                conversionOptions.style.display = 'flex';
+            }
+        }
+
+        async function convertCombined() {
+            if (selectedFiles.length === 0) {
+                updateStatus('Please select one or more files.', 'error');
+                return;
+            }
+            setLoading(true);
+            const pdfDoc = await PDFDocument.create();
+
+            try {
+                for (const file of selectedFiles) {
+                    await processFile(pdfDoc, file);
+                }
+                if (pdfDoc.getPageCount() === 0) throw new Error(`No convertible files were selected.`);
+
+                const pdfBytes = await pdfDoc.save();
+                const fileName = selectedFiles.length === 1 ? `${selectedFiles[0].name.split('.').slice(0,-1).join('.')}-converted.pdf` : "converted-files.pdf";
+                createDownloadLink(pdfBytes, fileName);
+                updateStatus('Conversion successful!', 'success');
+            } catch (error) {
+                console.error('Conversion Error:', error);
+                updateStatus(error.message, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        async function convertSeparately() {
+            if (selectedFiles.length === 0) {
+                updateStatus('Please select files.', 'error');
+                return;
+            }
+            setLoading(true);
+
+            try {
+                let convertedCount = 0;
+                for (const file of selectedFiles) {
+                    try {
+                        const pdfDoc = await PDFDocument.create();
+                        await processFile(pdfDoc, file);
+                        
+                        if (pdfDoc.getPageCount() > 0) {
+                            const pdfBytes = await pdfDoc.save();
+                            const baseName = file.name.split('.').slice(0, -1).join('.') || file.name;
+                            triggerDownload(pdfBytes, `${baseName}-converted.pdf`);
+                            convertedCount++;
+                            // A small delay to help browsers manage multiple downloads
+                            await new Promise(resolve => setTimeout(resolve, 300));
+                        }
+                    } catch (fileError) {
+                        console.error(`Could not convert ${file.name}:`, fileError);
+                    }
+                }
+                if (convertedCount === 0) throw new Error('No files could be converted.');
+                updateStatus(`${convertedCount} files converted successfully!`, 'success');
+                setTimeout(resetUI, 1500); // Reset UI after a short delay
+            } catch (error) {
+                updateStatus(error.message, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function processFile(pdfDoc, file) {
+            const fileType = file.type;
+            if (fileType.startsWith('image/')) {
+                await addImageToPdf(pdfDoc, file);
+            } else if (fileType.startsWith('text/')) {
+                await addTextToPdf(pdfDoc, file);
+            } else {
+                console.warn(`Skipping unsupported file type: ${file.name} (${fileType})`);
+            }
+        }
+        
+        async function addImageToPdf(pdfDoc, imageFile) {
+            const imageBytes = await fileToByteArray(imageFile);
+            let image;
+            if (imageFile.type === 'image/jpeg') image = await pdfDoc.embedJpg(imageBytes);
+            else if (imageFile.type === 'image/png') image = await pdfDoc.embedPng(imageBytes);
+            else {
+                console.warn(`Skipping unsupported image type: ${imageFile.name}`);
+                return;
+            }
+            const page = pdfDoc.addPage([image.width, image.height]);
+            page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        }
+        
+        async function addTextToPdf(pdfDoc, textFile) {
+            const page = pdfDoc.addPage();
+            const textContent = await textFile.text();
+            page.drawText(textContent, { x: 50, y: page.getHeight() - 50, size: 12, color: rgb(0, 0, 0) });
+        }
+
+        function createDownloadLink(pdfBytes, newFileName) {
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            
+            downloadLink.href = url;
+            downloadLink.download = newFileName;
+            downloadLink.style.display = 'inline-block';
+            convertBtn.style.display = 'none';
+            conversionOptions.style.display = 'none';
+        }
+
+        function triggerDownload(pdfBytes, fileName) {
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function fileToByteArray(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => resolve(new Uint8Array(event.target.result));
+                reader.onerror = (error) => reject(error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                loader.style.display = 'block';
+                statusDisplay.textContent = 'Converting, please wait...';
+                convertBtn.disabled = true;
+                combineBtn.disabled = true;
+                separateBtn.disabled = true;
+            } else {
+                loader.style.display = 'none';
+                convertBtn.disabled = false;
+                combineBtn.disabled = false;
+                separateBtn.disabled = false;
+            }
+        }
+        
+        function updateStatus(message, type) {
+            statusDisplay.textContent = message;
+            statusDisplay.style.color = type === 'error' ? '#ff6b6b' : '#51cf66';
+        }
+        
+        // --- Interactive Effects ---
+
+        // Button Ripple Effect
+        function createRipple(event) {
+            const button = event.currentTarget;
+            const circle = document.createElement("span");
+            const diameter = Math.max(button.clientWidth, button.clientHeight);
+            const radius = diameter / 2;
+
+            circle.style.width = circle.style.height = `${diameter}px`;
+            // Position the circle at the cursor's location
+            circle.style.left = `${event.clientX - button.getBoundingClientRect().left - radius}px`;
+            circle.style.top = `${event.clientY - button.getBoundingClientRect().top - radius}px`;
+            circle.classList.add("ripple");
+
+            const ripple = button.getElementsByClassName("ripple")[0];
+            if (ripple) {
+                ripple.remove();
+            }
+
+            button.appendChild(circle);
+        }
+
+        document.querySelectorAll(".btn").forEach(button => {
+            button.addEventListener("click", createRipple);
+        });
+        
+        // Interactive Window Tilt Effect
+        const card = document.querySelector('.converter-card');
+        document.body.addEventListener('mousemove', (e) => {
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            
+            const rotateX = ((e.clientY - centerY) / centerY) * -8; // Increased tilt amplitude
+            const rotateY = ((e.clientX - centerX) / centerX) * 8;  // Increased tilt amplitude
+            
+            card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        });
+
+        document.body.addEventListener('mouseleave', () => {
+            card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+        });
+
+    </script>
+</body>
+</html>
+
