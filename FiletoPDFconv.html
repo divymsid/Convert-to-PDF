@@ -282,27 +282,10 @@
             margin: 0 auto;
         }
         
-        /* Ripple effect for buttons */
-        .ripple {
-            position: absolute;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.7);
-            transform: scale(0);
-            animation: ripple-effect 0.6s linear;
-            pointer-events: none;
-        }
-        
         .copyright {
             margin-top: 2rem;
             font-size: 0.8rem;
             color: rgba(224, 224, 224, 0.5);
-        }
-
-        @keyframes ripple-effect {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
         }
 
         @keyframes spin {
@@ -383,6 +366,9 @@
         const loader = document.getElementById('loader');
 
         let selectedFiles = [];
+        const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+        const SUPPORTED_TEXT_TYPES = ['text/plain', 'text/markdown', 'text/csv'];
+
 
         // --- Event Listeners ---
         fileInput.addEventListener('change', (event) => handleFileSelect(event.target.files));
@@ -422,16 +408,34 @@
             convertBtn.style.display = 'inline-block';
             convertBtn.disabled = true;
             
-            statusDisplay.textContent = '';
+            updateStatus('', 'info');
         }
         
         function handleFileSelect(files) {
             if (!files || files.length === 0) return;
             
-            selectedFiles = Array.from(files);
+            const allFiles = Array.from(files);
+            selectedFiles = allFiles.filter(file => 
+                SUPPORTED_IMAGE_TYPES.includes(file.type) || SUPPORTED_TEXT_TYPES.some(t => file.type.startsWith(t))
+            );
+
+            const unsupportedCount = allFiles.length - selectedFiles.length;
+
             uploadText.style.display = 'none';
             downloadLink.style.display = 'none';
-            statusDisplay.textContent = '';
+            
+            if (selectedFiles.length === 0) {
+                updateStatus('Word/Excel & other documents are not supported.', 'error');
+                fileNameDisplay.textContent = `${allFiles.length} unsupported files selected.`;
+                convertBtn.disabled = true;
+                return;
+            }
+
+            if (unsupportedCount > 0) {
+                updateStatus(`${unsupportedCount} unsupported file(s) were ignored.`, 'info');
+            } else {
+                 updateStatus('', 'info');
+            }
             
             if (selectedFiles.length === 1) {
                 fileNameDisplay.textContent = selectedFiles[0].name;
@@ -447,7 +451,7 @@
 
         async function convertCombined() {
             if (selectedFiles.length === 0) {
-                updateStatus('Please select one or more files.', 'error');
+                updateStatus('Please select one or more supported files.', 'error');
                 return;
             }
             setLoading(true);
@@ -457,7 +461,7 @@
                 for (const file of selectedFiles) {
                     await processFile(pdfDoc, file);
                 }
-                if (pdfDoc.getPageCount() === 0) throw new Error(`No convertible files were selected.`);
+                if (pdfDoc.getPageCount() === 0) throw new Error(`No convertible files were processed.`);
 
                 const pdfBytes = await pdfDoc.save();
                 const fileName = selectedFiles.length === 1 ? `${selectedFiles[0].name.split('.').slice(0,-1).join('.')}-converted.pdf` : "converted-files.pdf";
@@ -473,7 +477,7 @@
         
         async function convertSeparately() {
             if (selectedFiles.length === 0) {
-                updateStatus('Please select files.', 'error');
+                updateStatus('Please select supported files.', 'error');
                 return;
             }
             setLoading(true);
@@ -508,33 +512,63 @@
         }
 
         async function processFile(pdfDoc, file) {
-            const fileType = file.type;
-            if (fileType.startsWith('image/')) {
+            if (SUPPORTED_IMAGE_TYPES.includes(file.type)) {
                 await addImageToPdf(pdfDoc, file);
-            } else if (fileType.startsWith('text/')) {
+            } else if (SUPPORTED_TEXT_TYPES.some(t => file.type.startsWith(t))) {
                 await addTextToPdf(pdfDoc, file);
-            } else {
-                console.warn(`Skipping unsupported file type: ${file.name} (${fileType})`);
             }
         }
         
         async function addImageToPdf(pdfDoc, imageFile) {
             const imageBytes = await fileToByteArray(imageFile);
             let image;
-            if (imageFile.type === 'image/jpeg') image = await pdfDoc.embedJpg(imageBytes);
-            else if (imageFile.type === 'image/png') image = await pdfDoc.embedPng(imageBytes);
-            else {
-                console.warn(`Skipping unsupported image type: ${imageFile.name}`);
-                return;
+
+            // pdf-lib has native support for jpg and png
+            if (imageFile.type === 'image/jpeg') {
+                image = await pdfDoc.embedJpg(imageBytes);
+            } else if (imageFile.type === 'image/png') {
+                image = await pdfDoc.embedPng(imageBytes);
+            } else {
+                // For other types (GIF, WEBP etc.), use a canvas to convert to PNG first.
+                const pngBytes = await convertImageToPng(imageFile);
+                image = await pdfDoc.embedPng(pngBytes);
             }
+            
             const page = pdfDoc.addPage([image.width, image.height]);
             page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        }
+
+        async function convertImageToPng(imageFile) {
+            return new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    // Convert canvas to a PNG data URL, then to a byte array
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const pngBytes = fetch(dataUrl).then(res => res.arrayBuffer()).then(buffer => new Uint8Array(buffer));
+                    resolve(pngBytes);
+                };
+                img.onerror = (e) => reject(new Error('Could not load image file.'));
+                img.src = URL.createObjectURL(imageFile);
+            });
         }
         
         async function addTextToPdf(pdfDoc, textFile) {
             const page = pdfDoc.addPage();
+            const { width, height } = page.getSize();
             const textContent = await textFile.text();
-            page.drawText(textContent, { x: 50, y: page.getHeight() - 50, size: 12, color: rgb(0, 0, 0) });
+            page.drawText(textContent, { 
+                x: 50, 
+                y: height - 50, 
+                size: 12, 
+                color: rgb(0, 0, 0),
+                maxWidth: width - 100,
+                lineHeight: 14,
+            });
         }
 
         function createDownloadLink(pdfBytes, newFileName) {
@@ -586,52 +620,21 @@
         
         function updateStatus(message, type) {
             statusDisplay.textContent = message;
-            statusDisplay.style.color = type === 'error' ? '#ff6b6b' : '#51cf66';
+            if (type === 'error') statusDisplay.style.color = '#ff6b6b';
+            else if (type === 'success') statusDisplay.style.color = '#51cf66';
+            else statusDisplay.style.color = 'var(--text-color)';
         }
         
         // --- Interactive Effects ---
-
-        // Button Ripple Effect
-        function createRipple(event) {
-            const button = event.currentTarget;
-            const circle = document.createElement("span");
-            const diameter = Math.max(button.clientWidth, button.clientHeight);
-            const radius = diameter / 2;
-
-            circle.style.width = circle.style.height = `${diameter}px`;
-            // Position the circle at the cursor's location
-            circle.style.left = `${event.clientX - button.getBoundingClientRect().left - radius}px`;
-            circle.style.top = `${event.clientY - button.getBoundingClientRect().top - radius}px`;
-            circle.classList.add("ripple");
-
-            const ripple = button.getElementsByClassName("ripple")[0];
-            if (ripple) {
-                ripple.remove();
-            }
-
-            button.appendChild(circle);
-        }
-
-        document.querySelectorAll(".btn").forEach(button => {
-            button.addEventListener("click", createRipple);
-        });
-        
-        // Interactive Window Tilt Effect
         const card = document.querySelector('.converter-card');
         document.body.addEventListener('mousemove', (e) => {
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
-            
-            const rotateX = ((e.clientY - centerY) / centerY) * -8; // Increased tilt amplitude
-            const rotateY = ((e.clientX - centerX) / centerX) * 8;  // Increased tilt amplitude
-            
+            const rotateX = ((e.clientY - centerY) / centerY) * -8;
+            const rotateY = ((e.clientX - centerX) / centerX) * 8;
             card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
         });
-
-        document.body.addEventListener('mouseleave', () => {
-            card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
-        });
-
+        document.body.addEventListener('mouseleave', () => card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)');
     </script>
 </body>
 </html>
